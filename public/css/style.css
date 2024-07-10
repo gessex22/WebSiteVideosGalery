@@ -1,0 +1,14 @@
+
+body {
+    background-color: #f8f9fa;
+}
+
+
+.btn-block {
+    text-align: center;
+}
+
+.img-fluid {
+    max-height: 200px;
+    object-fit: cover;
+}

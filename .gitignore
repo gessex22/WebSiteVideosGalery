@@ -1,0 +1,7 @@
+/videos/*
+
+/public/images/*
+
+/node_modules
+
+copiarvideos.js
