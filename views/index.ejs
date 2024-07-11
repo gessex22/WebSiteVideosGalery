@@ -1,36 +1,43 @@
-<!-- views/index.ejs -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sitio de Videos</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/css/styles.css"> <!-- Agrega estilos personalizados si es necesario -->
+    <title>Lista de Videos</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
     <div class="container">
-        <h1 class="mt-5">Bienvenido al Sitio de Videos</h1>
-        <div class="">
-            <a href="" class="btn btn-secondary btn-block"> Video Aleatorio </a>
+        <h1>Lista de Videos</h1>
+        <div class="mb-3">
+            <button id="randomButton" class="btn btn-primary">Random</button>
+            <button id="shuffleButton" class="btn btn-secondary">Desorganizar</button>
         </div>
-        <div class="row">
+        <div id="videoContainer" class="row">
             <% videos.forEach(video => { %>
-            <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
-                <div class="card">
-                    <img src="<%= video.thumbnailPath %>" class="card-img-top" alt="<%= video.name %>">
-                    <div class="card-body">
-                        <h5 class="card-title"><%= video.name %></h5>
-                        <a href="<%= video.videoPath %>" class="btn btn-primary btn-block">Ver Video</a>
-                    </div>
+                <div class="col-12 col-md-6 col-lg-3 mb-4 video-item">
+                    <a href="/video/<%= encodeURIComponent(video.id) %>">
+                        <img src="/images<%= video.thumbnailPath %>" alt="<%= video.name %>" class="img-fluid">
+                        <p><%= video.name %></p>
+                    </a>
                 </div>
-            </div>
             <% }) %>
         </div>
     </div>
+    <script>
+        document.getElementById('randomButton').addEventListener('click', function() {
+            window.location.href = '/random';
+        });
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+        document.getElementById('shuffleButton').addEventListener('click', function() {
+            const container = document.getElementById('videoContainer');
+            const items = Array.from(container.getElementsByClassName('video-item'));
+            for (let i = items.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                container.appendChild(items[j]);
+            }
+        });
+    </script>
 </body>
 </html>

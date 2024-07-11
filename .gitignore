@@ -5,3 +5,6 @@
 /node_modules
 
 copiarvideos.js
+renombrararchivos.js
+cerializacionFile.js
+videos.json

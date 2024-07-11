@@ -1,14 +1,14 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const ffmpeg = require('fluent-ffmpeg');
 
 const app = express();
+const videoDataFile = path.join(__dirname, 'videos.json');
 
-// Ruta a la carpeta de videos y miniaturas
-//
-const videosDir =  'E:/videosCopiados'
-const thumbnailsDir = path.join(__dirname, 'public/images/thumbnails');
+function getRandomVideoId(videos) {
+    const randomIndex = Math.floor(Math.random() * videos.length);
+    return videos[randomIndex].id;
+}
 
 // Configuración del motor de plantillas EJS
 app.set('view engine', 'ejs');
@@ -16,62 +16,74 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Middleware para servir archivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/videos', express.static(videosDir));
 
-// Función para generar miniatura de video
-function generateThumbnail(videoPath, thumbnailPath) {
-    return new Promise((resolve, reject) => {
-        ffmpeg(videoPath)
-            .screenshots({
-                count: 1,
-                folder: thumbnailsDir,
-                size: '320x240',
-                filename: path.basename(videoPath, path.extname(videoPath)) + '.png',
-            })
-            .on('end', () => resolve())
-            .on('error', (err) => reject(err));
-    });
-}
+const videoDir = 'E:/MultimediaPC-videos/plantillas';
+app.use('/videos', express.static(videoDir));
 
 // Ruta principal - Renderizar index.ejs con la lista de videos y miniaturas
 app.get('/', (req, res) => {
-    fs.readdir(videosDir, async (err, files) => {
+    fs.readFile(videoDataFile, (err, data) => {
         if (err) {
-            return res.status(500).send('Error al leer el directorio de videos');
+            console.error('Error al leer el archivo JSON', err);
+            return res.status(500).send('Error interno del servidor');
         }
-
-        // Filtrar archivos para obtener solo los archivos de video
-        const videoFiles = files.filter(file => {
-            const ext = path.extname(file).toLowerCase();
-            return ext === '.mp4' || ext === '.avi' || ext === '.mkv';
-        });
-
-        // Crear una lista de objetos de videos con miniaturas
-        const videos = [];
-        for (let file of videoFiles) {
-            const videoPath = path.join(videosDir, file);
-            const thumbnailPath = path.join(thumbnailsDir, path.basename(file, path.extname(file)) + '.png');
-
-            // Generar miniatura si no existe
-            if (!fs.existsSync(thumbnailPath)) {
-                try {
-                    await generateThumbnail(videoPath, thumbnailPath);
-                } catch (err) {
-                    console.error('Error al generar miniatura para', file, err);
-                    continue; // Continuar con el siguiente archivo
-                }
-            }
-
-            // Agregar video a la lista
-            videos.push({
-                name: path.basename(file, path.extname(file)),
-                videoPath: `/videos/${file}`, // Ruta relativa del video
-                thumbnailPath: `/images/thumbnails/${path.basename(file, path.extname(file))}.png` // Ruta relativa de la miniatura
-            });
-        }
-
-        // Renderizar la vista index.ejs con la lista de videos y miniaturas
+        const videos = JSON.parse(data);
         res.render('index', { videos });
+    });
+});
+
+
+// Ruta para reproducir un video aleatorio
+app.get('/random', (req, res) => {
+    fs.readFile(videoDataFile, (err, data) => {
+        if (err) {
+            console.error('Error al leer el archivo JSON', err);
+            return res.status(500).send('Error interno del servidor');
+        }
+        const videos = JSON.parse(data);
+        const randomVideoId = getRandomVideoId(videos);
+        res.redirect(`/video/${randomVideoId}`);
+    });
+});
+
+// Ruta para mostrar un video individual
+// Ruta para mostrar un video individual
+// Ruta para mostrar un video individual
+app.get('/video/:id', (req, res) => {
+    const videoId = parseInt(req.params.id);
+    fs.readFile(videoDataFile, (err, data) => {
+        if (err) {
+            console.error('Error al leer el archivo JSON', err);
+            return res.status(500).send('Error interno del servidor');
+        }
+        const videos = JSON.parse(data);
+        const currentIndex = videos.findIndex(v => v.id === videoId);
+
+        if (currentIndex === -1) {
+            return res.status(404).send('Video no encontrado');
+        }
+
+        const video = videos[currentIndex];
+        let prevVideo = null;
+        let nextVideo = null;
+
+        // Encontrar video anterior
+        if (currentIndex > 0) {
+            prevVideo = videos[currentIndex - 1].id;
+        }
+
+        // Encontrar video siguiente
+        if (currentIndex < videos.length - 1) {
+            nextVideo = videos[currentIndex + 1].id;
+        }
+
+        res.render('video', { 
+            videoName: video.name,
+            videoPath: video.videoPath,
+            videoId: video.id,
+            prevVideo,
+            nextVideo
+        });
     });
 });
 

@@ -1,20 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/css/styles.css">
-    <title>Video</title>
+    <title><%= videoName %></title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        .video-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding-top: 20px;
+        }
+        video {
+            width: 100%;
+            height: auto;
+        }
+        .btn-group {
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="mt-5">Reproduciendo Video</h1>
-        <video width="100%" controls>
-            <source src="<%= `/videos/${path.basename(videoPath)}` %>" type="video/mp4">
-            Your browser does not support the video tag.
+    <div class="container video-container">
+        <h1><%= videoName %></h1>
+        <video autoplay controls>
+            <source  src="<%= videoPath %>" type="video/mp4">
+            Tu navegador no soporta la etiqueta de video.
         </video>
-        <br>
-        <a href="/" class="btn btn-secondary mt-4">Volver a la página principal</a>
+        <div class="btn-group">
+            <a href="/video/<%= prevVideo %>" class="btn btn-secondary">Previo</a>
+            <a href="/video/<%= nextVideo %>" class="btn btn-secondary">Siguiente</a>
+            <a href="/random" class="btn btn-primary">Random</a>
+
+            <a href="/" class="btn btn-secondary">Volver al Índice</a>
+        </div>
     </div>
 </body>
+</html>
