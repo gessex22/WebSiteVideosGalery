@@ -14,18 +14,55 @@
             <button id="randomButton" class="btn btn-primary">Random</button>
             <button id="shuffleButton" class="btn btn-secondary">Desorganizar</button>
         </div>
-        <div id="videoContainer" class="row">
-            <% videos.forEach(video => { %>
-                <div class="col-12 col-md-6 col-lg-3 mb-4 video-item">
-                    <a href="/video/<%= encodeURIComponent(video.id) %>">
-                        <img src="/images<%= video.thumbnailPath %>" alt="<%= video.name %>" class="img-fluid">
-                        <p><%= video.name %></p>
-                    </a>
-                </div>
-            <% }) %>
-        </div>
+        <div id="videoContainer" class="row"></div>
+        <div id="pagination" class="mt-3"></div>
     </div>
     <script>
+        const pagination = document.getElementById('pagination');
+        const videoContainer = document.getElementById('videoContainer');
+        let currentPage = 1;
+        const pageSize = 12;
+
+        function fetchVideos(page) {
+            fetch(`/api/videos?page=${page}`)
+                .then(response => response.json())
+                .then(data => {
+                    videoContainer.innerHTML = '';
+                    data.videos.forEach(video => {
+                        const videoElement = document.createElement('div');
+                        videoElement.className = 'col-12 col-md-6 col-lg-3 mb-4 video-item';
+                        videoElement.innerHTML = `
+                            <a href="/video/${encodeURIComponent(video.id)}">
+                                <img src="/images${video.thumbnailPath}" alt="${video.name}" class="img-fluid">
+                                <p>${video.name}</p>
+                            </a>
+                        `;
+                        videoContainer.appendChild(videoElement);
+                    });
+                    renderPagination(data.page, data.total, data.pageSize);
+                })
+                .catch(error => console.error('Error fetching videos:', error));
+        }
+
+        function renderPagination(currentPage, totalItems, pageSize) {
+            const totalPages = Math.ceil(totalItems / pageSize);
+            pagination.innerHTML = '';
+
+            for (let page = 1; page <= totalPages; page++) {
+                const pageLink = document.createElement('button');
+                pageLink.className = 'btn btn-secondary m-1';
+                pageLink.textContent = page;
+                if (page === currentPage) {
+                    pageLink.classList.add('btn-primary');
+                    pageLink.classList.remove('btn-secondary');
+                }
+                pageLink.addEventListener('click', () => {
+                    fetchVideos(page);
+                });
+                pagination.appendChild(pageLink);
+            }
+        }
+
         document.getElementById('randomButton').addEventListener('click', function() {
             window.location.href = '/random';
         });
@@ -38,6 +75,9 @@
                 container.appendChild(items[j]);
             }
         });
+
+        // Fetch and display the initial set of videos
+        fetchVideos(currentPage);
     </script>
 </body>
 </html>
