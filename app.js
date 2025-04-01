@@ -4,12 +4,13 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config()
 const { updateGalery } = require('./cerializacionFile');
+const { getStatus } = require('./controllers/admin');
 
 const app = express();
 const videoDataFile = path.join(__dirname, 'videos.json');
 
 
-const videoDir = process.env.PATHFILE ||'E:/MultimediaPC-videos/plantillas';
+const videoDir = process.env.PATHFILE ||' ';
 
 function getRandomVideoId(videos) {
     const randomIndex = Math.floor(Math.random() * videos.length);
@@ -29,6 +30,14 @@ app.use('/videos', express.static(videoDir));
 
 // Ruta principal - Renderizar index.ejs con la lista de videos y miniaturas
 app.get('/', (req, res) => {
+
+const clientInfo = {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        referer: req.headers['referer'] || 'N/A',
+        cookies: req.cookies
+    };
+    console.log('Cliente HTTP conectado:', clientInfo);
 
     const page = parseInt(req.query.page) || 1; // Página actual (por defecto 1)
     const pageSize = 12; // Tamaño de la página (cantidad de videos por página)
@@ -55,9 +64,12 @@ app.get('/', (req, res) => {
     });
 });
 
+//endpoint para linea del server
+app.get('/status', getStatus)
 
 // Ruta para reproducir un video aleatorio
 app.get('/random', (req, res) => {
+
 
    
     fs.readFile(videoDataFile, (err, data) => {
