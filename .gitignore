@@ -1,5 +1,7 @@
 /videos/*
 
+*.pem
+
 /public/images/*
 
 /node_modules
