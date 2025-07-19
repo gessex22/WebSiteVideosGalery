@@ -5,6 +5,9 @@
 /node_modules
 /errs
 
+
+*.pem
+
 package-lock.json
 copiarvideos.js
 
