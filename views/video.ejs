@@ -1,39 +1,148 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><%= videoName %></title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    />
     <style>
-        .video-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding-top: 20px;
-        }
-        video {
-            width: 100%;
-            height: auto;
-        }
-        .btn-group {
-            margin-top: 20px;
-        }
+      .video-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding-top: 20px;
+      }
+      video {
+        width: 100%;
+        height: auto;
+      }
+      .btn-group {
+        margin-top: 20px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container video-container">
-        <h1><%= videoName %></h1>
-        <video autoplay controls>
-            <source  src="<%= videoPath %>" type="video/mp4">
-            Tu navegador no soporta la etiqueta de video.
-        </video>
-        <div class="btn-group">
-            <a href="/video/<%= prevVideo %>" class="btn btn-secondary">Previo</a>
-            <a href="/video/<%= nextVideo %>" class="btn btn-secondary">Siguiente</a>
-            <a href="/random" class="btn btn-primary">Random</a>
-
-            <a href="/" class="btn btn-secondary">Volver al Índice</a>
-        </div>
+      <h1><%= videoName %></h1>
+      <video id="videoPlayer" controls autoplay>
+        Tu navegador no soporta la etiqueta de video.
+      </video>
+      <div class="btn-group">
+        <a href="/video/<%= prevVideo %>" class="btn btn-secondary">Previo</a>
+        <a href="/video/<%= nextVideo %>" class="btn btn-secondary">Siguiente</a>
+        <a href="/random" class="btn btn-primary">Random</a>
+        <a href="/" class="btn btn-secondary">Volver al Índice</a>
+      </div>
     </div>
-</body>
+
+
+<script>
+  // 1) Convierte Base64 URL-safe → ArrayBuffer
+  function base64ToArrayBuffer(b64) {
+    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4 !== 0) b64 += '=';
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr.buffer;
+  }
+
+  // 2) Obtener clave privada PKCS#8
+  async function getPrivateKeyPem() {
+    const res = await fetch('/key/private');
+    if (!res.ok) throw new Error('No se pudo obtener la clave privada');
+    return res.text();
+  }
+
+  // 3) Importa la PEM PKCS#8 como CryptoKey RSA-OAEP
+  async function importPrivateKey(pem) {
+    const hdr = "-----BEGIN PRIVATE KEY-----";
+    const ftr = "-----END PRIVATE KEY-----";
+    let body = pem.trim();
+    if (body.startsWith(hdr) && body.endsWith(ftr)) {
+      body = body.slice(hdr.length, -ftr.length);
+    }
+    body = body.replace(/\s+/g, '');
+    const der = base64ToArrayBuffer(body);
+    return crypto.subtle.importKey(
+      'pkcs8',
+      der,
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      false,
+      ['decrypt']
+    );
+  }
+
+  // 4) Desencripta la clave AES con RSA-OAEP
+  async function decryptAesKey(rsaEncryptedKeyB64, privateKey) {
+    const buf = base64ToArrayBuffer(rsaEncryptedKeyB64);
+    const raw = await crypto.subtle.decrypt(
+      { name: 'RSA-OAEP' },
+      privateKey,
+      buf
+    );
+    return raw; // ArrayBuffer de 32 bytes
+  }
+
+  // 5) Función principal de descifrado y reproducción
+  async function decryptAndPlay(videoUrl, rsaEncryptedKeyB64) {
+    try {
+      // Desencriptar la clave AES
+      const pemText   = await getPrivateKeyPem();
+      const rsaKey    = await importPrivateKey(pemText);
+      const rawAesKey = await decryptAesKey(rsaEncryptedKeyB64, rsaKey);
+      const aesKey    = await crypto.subtle.importKey(
+        'raw',
+        rawAesKey,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt']
+      );
+
+      // Descargar el fichero .enc completo
+      const resp  = await fetch(videoUrl);
+      const ab    = await resp.arrayBuffer();
+      const bytes = new Uint8Array(ab);
+
+      // Separar IV (12), CIPHERTEXT y AUTH_TAG (16)
+      const iv       = bytes.slice(0, 12);
+      const authTag  = bytes.slice(bytes.length - 16);
+      const cipher   = bytes.slice(12, bytes.length - 16);
+
+      // Concatenar ciphertext + tag
+      const fullCipher = new Uint8Array(cipher.length + authTag.length);
+      fullCipher.set(cipher, 0);
+      fullCipher.set(authTag, cipher.length);
+
+      // Desencriptar con WebCrypto AES-GCM
+      const plain = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv, tagLength: 128 },
+        aesKey,
+        fullCipher.buffer
+      );
+
+      // Crear blob y asignar al <video>
+      const blob = new Blob([plain], { type: 'video/mp4' });
+      const url  = URL.createObjectURL(blob);
+      document.getElementById('videoPlayer').src = url;
+    } catch (e) {
+      console.error('Error desencriptando el video:', e);
+      alert('No se pudo reproducir el vídeo cifrado: ' + e.message);
+    }
+  }
+
+  // Ejecuta descifrado + play usando las variables inyectadas por EJS
+  decryptAndPlay(
+    "<%= videoPath %>",
+    "<%= videoKeyBase64 %>"
+  );
+</script>
+
+
+
+
+
+  </body>
 </html>
