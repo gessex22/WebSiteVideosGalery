@@ -89,8 +89,9 @@ app.get('/status', getStatus);
 
 // Función para obtener video aleatorio
 function getRandomVideoId(videos) {
-  const randomIndex = Math.floor(Math.random() * videos.length);
-  return videos[randomIndex].id;
+  const randomIndex = Math.floor(Math.random() * videos.files.length);
+  console.log( videos.files[randomIndex])
+  return videos.files[randomIndex].name;
 }
 
 // Ruta para video aleatorio
