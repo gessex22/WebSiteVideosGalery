@@ -1,6 +1,6 @@
-require('dotenv').config()
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const incomingDir = path.resolve(process.env.PATH_ENCRYPTED);  //debe ser el directorio a barrer por eso es el cryp
 const metadataCrudoPath = path.resolve( "./metadata_crudo.json");
@@ -22,7 +22,7 @@ function recorrerRecursivo(dir, lista = []) {
       lista.push({
         ruta: fullPath,
         cypher: false,
-        estatus: false
+        estatus: "pending"
       });
     }
   }
@@ -43,4 +43,7 @@ function indexCrudos() {
   console.log(`✅ Se indexaron ${archivos.length} archivos en ${metadataCrudoPath}`);
 }
 
+
+
+indexCrudos()
 module.exports = { indexCrudos };

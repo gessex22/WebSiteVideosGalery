@@ -32,7 +32,7 @@ async function generarThumbnails() {
   let cambios = false;
 
   for (const archivo of metadata) {
-    if (archivo.estatus === false) {
+    if (archivo.estatus === "pending") {
       try {
         const baseName = path.basename(
           archivo.ruta,
@@ -64,7 +64,7 @@ async function generarThumbnails() {
   }
 }
 
-function cifrarArchivos() {
+async function cifrarArchivos() {
   if (!fs.existsSync(metadataPath)) {
     console.error("❌ metadata_crudo.json no encontrado");
     return;
@@ -75,16 +75,16 @@ function cifrarArchivos() {
 
   for (const file of metadata) {
   console.log(file)
-    if (file.estatus == false )  {
+    if (file.estatus == "thumbnail-generated" )  {
       try {
-        cifrarArchivoIndividual(
+         await cifrarArchivoIndividual(
           file.ruta,
           publicKeyPem,
           namePwd,
           encryptedDir
         );
 
-        file.estatus = "encrypted";
+        file.cypher = true;
         procesados++;
         console.log(`🔐 Cifrado: ${file.ruta}`);
       } catch (err) {
@@ -98,8 +98,22 @@ function cifrarArchivos() {
 }
 
 
-// EJECUCIÓN SECUENCIAL DEL PIPELINE
-indexCrudos();
-generarThumbnails();
-cifrarArchivos();
-startWatcher()
+(async () => {
+  try {
+    // Paso 1: indexar crudos
+    await indexCrudos();
+
+    // Paso 2: generar thumbnails
+    await generarThumbnails();
+
+    // Paso 3: cifrar archivos
+    await cifrarArchivos();
+
+    // Paso 4: arrancar watcher
+    startWatcher();
+
+    console.log("🚀 Pipeline inicial completado.");
+  } catch (err) {
+    console.error("❌ Error en pipeline:", err.message || err);
+  }
+})();

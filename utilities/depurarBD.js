@@ -1,3 +1,22 @@
+/**
+ * Script de limpieza y reindexación de metadata.json para cuando la bd tiene archivos que no existen 
+ *
+ * 1. Lee el archivo metadata.json desde la ruta definida en PATH_ENCRYPTED.
+ * 2. Filtra los registros eliminando aquellos cuyo archivo en disco ya no existe.
+ * 3. Reasigna IDs consecutivos a los archivos válidos (1, 2, 3...).
+ * 4. Sobrescribe el metadata.json con la versión limpia.
+ * 5. Muestra en consola un resumen de archivos originales, válidos y eliminados.
+ *
+ * Uso: ejecutar con Node.js
+ *   node cleanMetadata.js
+ */
+
+
+
+
+
+
+
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';

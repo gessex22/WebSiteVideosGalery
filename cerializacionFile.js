@@ -13,63 +13,95 @@ const allowedRawExt = [".mp4", ".avi", ".mkv"];
 const namePwd = process.env.NAME_PWD;
 const publicKeyPem = fs.readFileSync(process.env.PUBLIC_KEY_PEM, "utf8");
 
+
+let processingQueue = Promise.resolve(); // Cola secuencial
+
+function enqueueProcess(task) {
+  processingQueue = processingQueue.then(() => task()).catch(err => {
+    console.error("❌ Error en cola:", err);
+  });
+}
+
 // Verificar extensión permitida
 function isRawVideo(file) {
   return allowedRawExt.includes(path.extname(file).toLowerCase());
 }
 
-// Procesamiento al detectar nuevo archivo
-async function handleNewRaw(fileName) {
-  const fullRaw = path.join(incomingDir, fileName);
-  if (!fs.existsSync(fullRaw) || !isRawVideo(fileName)) return;
+// Esperar a que el archivo termine de copiarse
+function waitForFileComplete(filePath, interval = 2000) {
+  return new Promise((resolve, reject) => {
+    let lastSize = -1;
 
-  try {
-    // Verificar que metadata.json exista
-    const metadataPath = path.join(encryptedDir, "metadata.json");
-    if (!fs.existsSync(encryptedDir)) fs.mkdirSync(encryptedDir, { recursive: true });
-
-    let metadata = { salt: null, files: [] };
-    if (fs.existsSync(metadataPath)) {
-      try {
-        metadata = JSON.parse(fs.readFileSync(metadataPath));
-      } catch (err) {
-        console.warn("⚠️ Error leyendo metadata.json, se inicializa vacío.");
+    const check = () => {
+      if (!fs.existsSync(filePath)) {
+        return reject(new Error(`El archivo desapareció: ${filePath}`));
       }
-    }
 
-    // Verificar si ya fue cifrado antes
-    const yaExiste = metadata.files.some(m => m.original_name === fileName);
-    if (yaExiste) {
-      console.log(`⚠️ Archivo ya registrado en metadata: ${fileName}`);
-      return;
-    }
+      const { size } = fs.statSync(filePath);
 
-    // Crear miniatura
-    const thumbnailName = uuidv4();
-    const thumbnailPath = path.join(thumbnailsDir, `${thumbnailName}.png`);
-    if (!fs.existsSync(thumbnailsDir)) fs.mkdirSync(thumbnailsDir, { recursive: true });
-    await generarMiniatura(fullRaw, thumbnailPath);
+      if (size === lastSize && size > 0) {
+        return resolve(); // ✅ El archivo ya no cambia de tamaño
+      }
 
-    // Cifrar individualmente
-    const { cifrarArchivoIndividual } = require("./cypherv2");
-    await cifrarArchivoIndividual(fullRaw, publicKeyPem, namePwd, encryptedDir);
+      lastSize = size;
+      setTimeout(check, interval); // sigue verificando hasta estabilizar
+    };
 
-    console.log(`✅ Video procesado: ${fileName}`);
-  } catch (err) {
-    console.error("❌ Error al procesar nuevo archivo:", err);
-  }
+    check();
+  });
 }
 
+// Procesamiento al detectar nuevo archivo
+async function handleNewRaw(fileName) {
+  enqueueProcess(async () => {
+    const fullRaw = path.join(incomingDir, fileName);
+    if (!fs.existsSync(fullRaw) || !isRawVideo(fileName)) return;
 
-// Watcher simple
+    try {
+      console.log(`📥 Detectado: ${fileName}, esperando...`);
+      await waitForFileComplete(fullRaw);
+      console.log(`✅ Estable: ${fileName}`);
+
+      // Crear miniatura con reintentos
+      const thumbnailName = uuidv4();
+      const thumbnailPath = path.join(thumbnailsDir, `${thumbnailName}.png`);
+      if (!fs.existsSync(thumbnailsDir)) fs.mkdirSync(thumbnailsDir, { recursive: true });
+
+      let success = false;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await generarMiniatura(fullRaw, thumbnailPath);
+          success = true;
+          break;
+        } catch (err) {
+          console.warn(`⚠️ ffmpeg fallo intento ${i + 1} para ${fileName}, reintentando...`);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+      if (!success) {
+        console.error(`❌ Miniatura falló definitivamente para ${fileName}`);
+        return;
+      }
+
+      // Cifrado
+      const { cifrarArchivoIndividual } = require("./cypherv2");
+      await cifrarArchivoIndividual(fullRaw, publicKeyPem, namePwd, encryptedDir);
+
+      console.log(`🎬 Procesado y cifrado: ${fileName}`);
+    } catch (err) {
+      console.error("❌ Error procesando:", err);
+    }
+  });
+}
+
+// Watcher
 function startWatcher() {
-  console.log("Watcher iniciado...");
+  console.log("👀 Watcher iniciado...");
   fs.watch(incomingDir, { recursive: false }, (event, fileName) => {
     if (event === "rename" && fileName && isRawVideo(fileName)) {
       handleNewRaw(fileName);
     }
   });
 }
-
 
 module.exports = { startWatcher };
